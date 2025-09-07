@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>ASCII Art Generator</title>
+<style>
+body {
+  margin: 0;
+  font-family: monospace;
+  background: #08121a;
+  color: #e8eefc;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: #0d1b2a;
+  color: #6ee7ff;
+  font-size: 1.8rem;
+  font-weight: bold;
+  border-bottom: 2px solid #222;
+  position: relative;
+}
+/* 3D Rotating Cube */
+.cube {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  transform-style: preserve-3d;
+  animation: spin 6s linear infinite;
+}
+.cube div {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  background: #000;
+  border: 1px solid #333;
+  opacity: 0.9;
+}
+.cube .front  { transform: translateZ(20px); }
+.cube .back   { transform: rotateY(180deg) translateZ(20px); }
+.cube .right  { transform: rotateY(90deg) translateZ(20px); }
+.cube .left   { transform: rotateY(-90deg) translateZ(20px); }
+.cube .top    { transform: rotateX(90deg) translateZ(20px); }
+.cube .bottom { transform: rotateX(-90deg) translateZ(20px); }
+@keyframes spin {
+  from { transform: rotateX(0) rotateY(0); }
+  to   { transform: rotateX(360deg) rotateY(360deg); }
+}
+.wrap {
+  flex: 1;
+  max-width: 900px;
+  margin: auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+}
+textarea { display: none; }
+.controls { margin-bottom: 1rem; }
+.note-box {
+  margin: 1rem 0;
+  padding: 0.8rem;
+  background: #1a2b3c;
+  border-left: 4px solid #6ee7ff;
+  font-size: 0.9em;
+  color: #cce7ff;
+}
+#previewBox { text-align: center; margin: 1rem 0; }
+#previewImg { max-width: 100%; max-height: 300px; border: 2px solid #444; background: #000; }
+#asciiContainer {
+  background: #000;
+  color: #6ee7ff;
+  font-family: monospace;
+  overflow: auto;
+  white-space: pre;
+  padding: 0.5rem;
+  border: 2px solid #444;
+  flex: 1;
+  font-size: 10px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+.custom-charset { margin-top: 0.5rem; }
+.custom-charset input { width: 70%; }
+footer {
+  text-align: center;
+  padding: 0.8rem;
+  background: #0d1b2a;
+  color: #aaa;
+  font-size: 0.85em;
+  border-top: 2px solid #222;
+}
+</style>
+</head>
+<body>
+<header>
+ASCII Art Generator
+<div class="cube">
+  <div class="front"></div><div class="back"></div><div class="right"></div>
+  <div class="left"></div><div class="top"></div><div class="bottom"></div>
+</div>
+</header>
+
+<div class="wrap">
+<div class="controls">
+<input type="file" id="imgfile" accept="image/*" />
+<input type="text" id="imgurl" placeholder="Image URL" />
+<button id="loadUrl">Load URL</button><br><br>
+
+<label>Font Size: <input type="range" id="fontSize" min="5" max="20" value="10"/></label><br>
+<label>Aspect Ratio: <input type="number" id="aspect" value="0.5" step="0.05"/></label><br>
+
+<label>Charset: <input id="charset" value="@%#*+=-:. "/></label>
+<select id="charsetPreset">
+  <option value="@%#*+=-:. ">Default</option>
+  <option value="█▓▒░">Blocks</option>
+  <option value="01">Binary</option>
+  <option value=" .:-=+*#%@">Dense Gradient</option>
+  <option value="▁▂▃▄▅▆▇█">Bars</option>
+  <option value="▲△■□◆◇">Shapes</option>
+  <option value="$&%#@">Money</option>
+  <option value="⚫⚪">Circles</option>
+  <option value="abcdefghijklmnopqrstuvwxyz">Alphabet</option>
+</select>
+<label><input type="checkbox" id="invert"/> Invert</label><br>
+
+<div class="custom-charset">
+  <label>Custom Charset: <input type="text" id="customCharset" placeholder="Enter characters"/></label>
+  <button id="useCustomCharset">Use Custom Charset</button>
+</div><br>
+
+<label>Text Color: 
+<select id="colorSelect">
+  <option value="#6ee7ff">Cyan</option>
+  <option value="#00ff00">Green</option>
+  <option value="#ff3333">Red</option>
+  <option value="#ffff66">Yellow</option>
+  <option value="#ffffff">White</option>
+  <option value="#ff66ff">Pink</option>
+</select>
+</label><br><br>
+
+<button id="genBtn">Generate</button>
+<button id="copyBtn">Copy</button>
+<button id="zoomInBtn">Zoom In</button>
+<button id="zoomOutBtn">Zoom Out</button>
+<select id="downloadType">
+  <option value="html">Download as HTML</option>
+  <option value="png">Download as Image (PNG)</option>
+</select>
+<button id="downloadBtn">Download</button>
+</div>
+
+<div class="note-box">⚡ Speed depends on your device performance.</div>
+<div id="previewBox">
+  <img id="previewImg" alt="Preview will appear here" />
+</div>
+<div id="asciiContainer"></div>
+<textarea id="ascii" readonly></textarea>
+</div>
+
+<footer>
+Developed by with the help of GPT 😑  © 2025 | ASCII Art Generator StaticWeb App
+</footer>
+
+<script>
+const asciiContainer = document.getElementById("asciiContainer");
+const genBtn = document.getElementById("genBtn");
+const copyBtn = document.getElementById("copyBtn");
+const downloadBtn = document.getElementById("downloadBtn");
+const downloadType = document.getElementById("downloadType");
+const fontSize = document.getElementById("fontSize");
+const charsetEl = document.getElementById("charset");
+const charsetPreset = document.getElementById("charsetPreset");
+const invertEl = document.getElementById("invert");
+const colorSelect = document.getElementById("colorSelect");
+const previewImg = document.getElementById("previewImg");
+const customCharsetInput = document.getElementById("customCharset");
+const useCustomBtn = document.getElementById("useCustomCharset");
+const aspectEl = document.getElementById("aspect");
+let loadedImg = null;
+let currentZoom = parseInt(fontSize.value,10);
+
+// Charset preset
+charsetPreset.addEventListener("change", ()=>{ charsetEl.value = charsetPreset.value; });
+useCustomBtn.addEventListener("click", ()=>{ 
+  const val = customCharsetInput.value; 
+  if(val) charsetEl.value = val; 
+  else alert("Enter characters!"); 
+});
+
+// Load file
+document.getElementById("imgfile").addEventListener("change", e=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ev=>{
+    previewImg.src = ev.target.result;
+    loadImage(ev.target.result);
+  };
+  reader.readAsDataURL(file);
+});
+
+// Load URL
+document.getElementById("loadUrl").addEventListener("click", ()=>{
+  const url=document.getElementById("imgurl").value.trim();
+  if(url) { previewImg.src=url; loadImage(url); }
+});
+
+function loadImage(src){
+  const img=new Image();
+  img.crossOrigin="anonymous";
+  img.onload=()=>{ loadedImg=img; };
+  img.onerror=()=>alert("Could not load image.");
+  img.src=src;
+}
+
+// Generate ASCII
+function generateASCII(){
+  if(!loadedImg){ alert("Load an image first!"); return; }
+
+  const aspect = parseFloat(aspectEl.value) || 0.5;
+  const newWidth = loadedImg.width;
+  const newHeight = Math.floor(loadedImg.height * aspect);
+
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  canvas.width = newWidth;
+  canvas.height = newHeight;
+  ctx.drawImage(loadedImg,0,0,newWidth,newHeight);
+
+  const imgData = ctx.getImageData(0,0,newWidth,newHeight).data;
+  const charset = charsetEl.value || "@%#*+=-:. ";
+  const invert = invertEl.checked;
+
+  asciiContainer.textContent = "";
+  asciiContainer.style.color = colorSelect.value;
+
+  let y=0;
+  function processRow(){
+    let rowArr = [];
+    for(let x=0;x<newWidth;x++){
+      const idx = (y*newWidth+x)*4;
+      const r=imgData[idx], g=imgData[idx+1], b=imgData[idx+2];
+      const lum = 0.2126*r + 0.7152*g + 0.0722*b;
+      let charIndex = Math.floor(lum/255*(charset.length-1));
+      if(invert) charIndex = charset.length-1-charIndex;
+      rowArr.push(charset[charIndex]);
+    }
+    asciiContainer.textContent += rowArr.join("") + "\n";
+    y++;
+    if(y<newHeight) setTimeout(processRow,0);
+    else updateFontSize();
+  }
+  processRow();
+}
+
+// Copy
+copyBtn.addEventListener("click", ()=>{ if(asciiContainer.textContent) navigator.clipboard.writeText(asciiContainer.textContent); });
+
+// Zoom
+function updateFontSize(){ asciiContainer.style.fontSize = currentZoom + "px"; }
+document.getElementById("zoomInBtn").addEventListener("click", ()=>{ currentZoom+=2; updateFontSize(); });
+document.getElementById("zoomOutBtn").addEventListener("click", ()=>{ if(currentZoom>4){currentZoom-=2;updateFontSize();} });
+
+// Generate
+genBtn.addEventListener("click", generateASCII);
+
+// Download
+downloadBtn.addEventListener("click", ()=>{
+  if(!asciiContainer.textContent) return;
+  const color=colorSelect.value;
+  if(downloadType.value==="html"){
+    const htmlContent = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>ASCII Art</title>
+<style>body{background:#08121a;color:${color};font-family:monospace;white-space:pre;}</style></head>
+<body><pre>${asciiContainer.textContent}</pre></body></html>`;
+    const blob = new Blob([htmlContent],{type:"text/html"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "ascii-art.html";
+    a.click();
+  } else {
+    const lines = asciiContainer.textContent.split("\n");
+    const fs = currentZoom;
+    const can = document.createElement("canvas");
+    const cctx = can.getContext("2d");
+    const maxWidth = Math.max(...lines.map(l=>l.length));
+    can.width = maxWidth*fs*0.6;
+    can.height = lines.length*fs*1.2;
+    cctx.fillStyle="#000"; cctx.fillRect(0,0,can.width,can.height);
+    cctx.font = fs+"px monospace"; cctx.fillStyle=color;
+    lines.forEach((line,i)=> cctx.fillText(line,2,(i+1)*fs*1.1));
+    const a = document.createElement("a");
+    a.href = can.toDataURL("image/png");
+    a.download = "ascii-art.png";
+    a.click();
+  }
+});
+</script>
+</body>
+</html>
