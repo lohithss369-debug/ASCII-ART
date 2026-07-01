@@ -1,0 +1,19 @@
+{
+  "name": "Stack Tower 3D",
+  "short_name": "Stack Tower",
+  "description": "An isometric 3D stacking game featuring zero network latency framework dependencies.",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#D0CBC7",
+  "theme_color": "#D0CBC7",
+  "orientation": "portrait",
+  "categories": ["games", "entertainment"],
+  "icons": [
+    {
+      "src": "app_icon.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

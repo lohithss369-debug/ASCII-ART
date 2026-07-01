@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Stack Tower 3D - Ultimate PWA Edition</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#D0CBC7">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    
+    <style>
+        @font-face {
+            font-family: 'Comfortaa';
+            src: url('Comfortaa-Regular.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+            font-display: swap;
+        }
+
+        html, body {
+            margin: 0;
+            overflow: hidden;
+            height: 100%;
+            width: 100%;
+            position: relative;
+            font-family: 'Comfortaa', sans-serif;
+            background-color: #D0CBC7;
+            transition: background-color 0.8s ease;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        #container { width: 100%; height: 100%; position: relative; }
+        #score-panel {
+            position: absolute; top: 20px; width: 100%; text-align: center;
+            display: flex; flex-direction: column; align-items: center;
+            z-index: 10; pointer-events: none;
+        }
+        #score {
+            font-size: 10vh; font-weight: bold; transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); color: #333344;
+        }
+        #best-score {
+            font-size: 2.5vh; opacity: 0.7; color: #333344; margin-top: -5px; letter-spacing: 1px;
+        }
+        #game { position: absolute; top: 0; right: 0; bottom: 0; left: 0; }
+        
+        .game-over {
+            position: absolute; top: 0; left: 0; width: 100%; height: 85%;
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center; pointer-events: none; z-index: 10;
+        }
+        .game-over * { transition: opacity 0.5s ease, transform 0.5s ease; opacity: 0; transform: translateY(-30px); color: #333344; }
+        .game-over h2 { margin: 0; padding: 0; font-size: 45px; letter-spacing: 2px; }
+        .game-over p { font-size: 20px; margin: 10px 0; }
+        
+        .game-ready {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; align-items: center; justify-content: space-around; z-index: 10;
+        }
+        #start-button {
+            transition: opacity 0.5s ease, transform 0.5s ease, background-color 0.2s; 
+            opacity: 0; transform: translateY(-50px);
+            border: 3px solid #333344; padding: 12px 35px; background-color: transparent; 
+            color: #333344; font-size: 32px; font-family: 'Comfortaa', sans-serif; cursor: pointer; border-radius: 50px;
+        }
+        #start-button:active { background-color: rgba(51, 51, 68, 0.1); }
+        
+        #instructions {
+            position: absolute; width: 100%; top: 18vh; left: 0; text-align: center;
+            transition: opacity 0.5s ease; opacity: 0; color: #333344; z-index: 10; pointer-events: none; font-size: 18px;
+        }
+        #zone-toast {
+            position: absolute; width: 100%; top: 28vh; left: 0; text-align: center;
+            transition: opacity 0.4s ease, transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+            opacity: 0; transform: scale(0.7); color: #333344; z-index: 10; pointer-events: none;
+            font-size: 24px; font-weight: bold; letter-spacing: 3px; text-transform: uppercase;
+        }
+        
+        #container.playing #score-panel { transform: translateY(0px); }
+        #container.playing #instructions { opacity: 0.8; }
+        #container.ready #start-button { opacity: 1; transform: translateY(0); }
+        #container.ended #score { transform: scale(1.3) translateY(4vh); }
+        #container.ended .game-over * { opacity: 1; transform: translateY(0); }
+        
+        #pwa-banner {
+            position: absolute; bottom: calc(20px + env(safe-area-inset-bottom)); left: 50%;
+            transform: translateX(-50%) translateY(150%); width: 90%; max-width: 400px;
+            background: #ffffff; border-radius: 16px; padding: 15px; display: flex;
+            justify-content: space-between; align-items: center; z-index: 30;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15); transition: transform 0.4s ease;
+            border: 1px solid rgba(0,0,0,0.05);
+        }
+        #pwa-banner.show { transform: translateX(-50%) translateY(0); }
+        .pwa-text { color: #333344; font-size: 14px; font-weight: bold; }
+        .pwa-btn { padding: 8px 18px; background: #333344; border: none; color: white; border-radius: 20px; font-family: 'Comfortaa', sans-serif; cursor: pointer; }
+    </style>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+</head>
+<body>
+
+<div id="container" class="ready">  
+    <div id="game"></div>  
+    <div id="score-panel">
+        <div id="score">0</div>
+        <div id="best-score">BEST: 0</div>
+    </div>  
+    <div id="instructions">Tap or Spacebar to snap the block</div>  
+    <div id="zone-toast">The Canopy</div>
+    <div class="game-over">  
+        <h2>Game Over</h2>  
+        <p>A spectacular run!</p>  
+        <p style="opacity: 0.6; font-size: 16px;">Tap anywhere to rebuild</p>  
+    </div>  
+    <div class="game-ready">  
+        <button id="start-button">Start</button>  
+        <div></div>  
+    </div>  
+</div>
+
+<div id="pwa-banner">
+    <div class="pwa-text">Install Stack Tower locally?</div>
+    <button id="pwa-install-btn" class="pwa-btn">Add</button>
+</div>
+
+<script>
+console.clear();
+
+// --- HIGH-PERFORMANCE LOW LATENCY HARDWARE AUDIO ENGINE ---
+class AudioManager {
+    constructor() {
+        this.ctx = null;
+        this.buffers = {};
+        this.bgm = null;
+        this.bgmNode = null;
+        this.bgmGain = null;
+        this.initialized = false;
+    }
+    init() {
+        if (this.initialized) return;
+        this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        this.loadSFX('perfect', 'audio/perfect.mp3');
+        this.loadSFX('drop', 'audio/drop.mp3');
+        this.loadSFX('game_over', 'audio/game_over.mp3');
+        
+        this.bgm = new Audio('audio/bgm.mp3');
+        this.bgm.loop = true;
+        this.bgm.crossOrigin = "anonymous";
+        
+        this.bgmNode = this.ctx.createMediaElementSource(this.bgm);
+        this.bgmGain = this.ctx.createGain();
+        this.bgmGain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+        this.bgmNode.connect(this.bgmGain);
+        this.bgmGain.connect(this.ctx.destination);
+        this.initialized = true;
+    }
+    async loadSFX(name, url) {
+        try {
+            const response = await fetch(url);
+            const buffer = await response.arrayBuffer();
+            this.buffers[name] = await this.ctx.decodeAudioData(buffer);
+        } catch (e) { console.warn(`Local audio asset bypassed or absent: ${url}`); }
+    }
+    playSFX(name) {
+        if (!this.initialized || !this.buffers[name]) return;
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+        const source = this.ctx.createBufferSource();
+        source.buffer = this.buffers[name];
+        source.connect(this.ctx.destination);
+        source.start(0);
+    }
+    startBGM() {
+        if (!this.initialized) return;
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+        this.bgmGain.gain.setTargetAtTime(0.3, this.ctx.currentTime, 0.3);
+        this.bgm.play().catch(() => {});
+    }
+    duckBGM() {
+        if (!this.initialized || !this.bgmGain) return;
+        this.bgmGain.gain.setTargetAtTime(0.05, this.ctx.currentTime, 0.5);
+    }
+}
+const audio = new AudioManager();
+
+// --- GRAPHICAL STAGE VIEW SHELL ---
+class Stage {
+    constructor() {
+        this.container = document.getElementById('game');  
+        this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" });  
+        this.renderer.setSize(window.innerWidth, window.innerHeight);  
+        this.renderer.setClearColor('#D0CBC7', 1);  
+        this.renderer.shadowMap.enabled = true;
+        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        this.container.appendChild(this.renderer.domElement);  
+        this.scene = new THREE.Scene();  
+
+        let aspect = window.innerWidth / window.innerHeight;  
+        let d = 20;  
+        this.camera = new THREE.OrthographicCamera(-d * aspect, d * aspect, d, -d, -100, 1000);  
+        this.camera.position.set(12, 14, 12);  
+        this.camera.lookAt(new THREE.Vector3(0, 0, 0));  
+        
+        this.light = new THREE.DirectionalLight(0xffffff, 0.6);  
+        this.light.position.set(10, 40, 15);  
+        this.light.castShadow = true;
+        this.light.shadow.mapSize.width = 1024;
+        this.light.shadow.mapSize.height = 1024;
+        this.light.shadow.camera.near = 0.5;
+        this.light.shadow.camera.far = 100;
+        let shadowSize = 15;
+        this.light.shadow.camera.left = -shadowSize;
+        this.light.shadow.camera.right = shadowSize;
+        this.light.shadow.camera.top = shadowSize;
+        this.light.shadow.camera.bottom = -shadowSize;
+        this.scene.add(this.light);  
+
+        this.softLight = new THREE.AmbientLight(0xffffff, 0.45);  
+        this.scene.add(this.softLight);  
+        
+        window.addEventListener('resize', () => this.onResize());  
+        this.onResize();  
+    }  
+      
+    setCamera(y, speed = 0.4) {  
+        gsap.to(this.camera.position, { y: y + 14, duration: speed, ease: "power1.inOut" });  
+        gsap.to(this.light.position, { y: y + 40, duration: speed, ease: "power1.inOut" });
+    }  
+      
+    onResize() {  
+        let viewSize = 30;  
+        this.renderer.setSize(window.innerWidth, window.innerHeight);  
+        this.camera.left = window.innerWidth / -viewSize;  
+        this.camera.right = window.innerWidth / viewSize;  
+        this.camera.top = window.innerHeight / viewSize;  
+        this.camera.bottom = window.innerHeight / -viewSize;  
+        this.camera.updateProjectionMatrix();  
+    }  
+      
+    render() { this.renderer.render(this.scene, this.camera); }  
+    add(elem) { this.scene.add(elem); }  
+    remove(elem) { this.scene.remove(elem); }
+}
+
+// --- STRUCTURAL MATHEMATICAL OBJECT COMPONENT ---
+class Block {
+    constructor(block) {
+        this.STATES = {ACTIVE: 'active', STOPPED: 'stopped', MISSED: 'missed'};
+        this.MOVE_AMOUNT = 12;
+        this.dimension = { width: 0, height: 0, depth: 0};  
+        this.position = {x: 0, y: 0, z: 0};  
+        this.targetBlock = block;  
+          
+        this.index = (this.targetBlock ? this.targetBlock.index : 0) + 1;  
+        this.workingPlane = this.index % 2 ? 'x' : 'z';  
+        this.workingDimension = this.index % 2 ? 'width' : 'depth';  
+          
+        this.dimension.width = this.targetBlock ? this.targetBlock.dimension.width : 10;  
+        this.dimension.height = this.targetBlock ? this.targetBlock.dimension.height : 2;  
+        this.dimension.depth = this.targetBlock ? this.targetBlock.dimension.depth : 10;  
+          
+        this.position.x = this.targetBlock ? this.targetBlock.position.x : 0;  
+        this.position.y = this.dimension.height * this.index;  
+        this.position.z = this.targetBlock ? this.targetBlock.position.z : 0;  
+          
+        this.colorOffset = this.targetBlock ? this.targetBlock.colorOffset : Math.round(Math.random() * 360);  
+          
+        if(!this.targetBlock) {  
+            this.color = new THREE.Color('#333344');  
+        } else {  
+            let hue = (this.colorOffset + this.index * 6) % 360;
+            this.color = new THREE.Color(`hsl(${hue}, 70%, 65%)`);
+        }  
+          
+        this.state = this.index > 1 ? this.STATES.ACTIVE : this.STATES.STOPPED;  
+        this.speed = -0.12 - (this.index * 0.003);  
+        if(this.speed < -0.4) this.speed = -0.4;  
+        this.direction = this.speed;  
+          
+        let geometry = new THREE.BoxGeometry(this.dimension.width, this.dimension.height, this.dimension.depth);  
+        geometry.applyMatrix4(new THREE.Matrix4().makeTranslation(this.dimension.width/2, this.dimension.height/2, this.dimension.depth/2));  
+        this.material = new THREE.MeshStandardMaterial({color: this.color, roughness: 0.3, metalness: 0.05});  
+        this.mesh = new THREE.Mesh(geometry, this.material);  
+        this.mesh.position.set(this.position.x, this.position.y, this.position.z);  
+        this.mesh.castShadow = true;
+        this.mesh.receiveShadow = true;
+          
+        if(this.state == this.STATES.ACTIVE) {  
+            this.position[this.workingPlane] = Math.random() > 0.5 ? -this.MOVE_AMOUNT : this.MOVE_AMOUNT;  
+        }  
+    }   
+
+    reverseDirection() {  
+        this.direction = this.direction > 0 ? this.speed : Math.abs(this.speed);     
+    }  
+
+    place() {  
+        this.state = this.STATES.STOPPED;  
+        let overlap = this.targetBlock.dimension[this.workingDimension] - Math.abs(this.position[this.workingPlane] - this.targetBlock.position[this.workingPlane]);  
+          
+        let blocksToReturn = { plane: this.workingPlane, direction: this.direction };  
+        const tolerance = 0.35; // Perfect alignment snap margin
+          
+        if(overlap > 0 && this.dimension[this.workingDimension] - overlap < tolerance) {  
+            overlap = this.dimension[this.workingDimension];  
+            blocksToReturn.bonus = true;  
+            this.position.x = this.targetBlock.position.x;  
+            this.position.z = this.targetBlock.position.z;  
+        }  
+          
+        if(overlap > 0) {  
+            let choppedDimensions = { width: this.dimension.width, height: this.dimension.height, depth: this.dimension.depth };  
+            choppedDimensions[this.workingDimension] -= overlap;  
+            this.dimension[this.workingDimension] = overlap;  
+                      
+            let placedGeometry = new THREE.BoxGeometry(this.dimension.width, this.dimension.height, this.dimension.depth);  
+            placedGeometry.applyMatrix4(new THREE.Matrix4().makeTranslation(this.dimension.width/2, this.dimension.height/2, this.dimension.depth/2));  
+            let placedMesh = new THREE.Mesh(placedGeometry, this.material);  
+            placedMesh.castShadow = true;
+            placedMesh.receiveShadow = true;
+              
+            let choppedGeometry = new THREE.BoxGeometry(choppedDimensions.width, choppedDimensions.height, choppedDimensions.depth);  
+            choppedGeometry.applyMatrix4(new THREE.Matrix4().makeTranslation(choppedDimensions.width/2, choppedDimensions.height/2, choppedDimensions.depth/2));  
+            let choppedMesh = new THREE.Mesh(choppedGeometry, this.material);  
+            choppedMesh.castShadow = true;
+              
+            let choppedPosition = { x: this.position.x, y: this.position.y, z: this.position.z }  
+              
+            if(this.position[this.workingPlane] < this.targetBlock.position[this.workingPlane]) {  
+                this.position[this.workingPlane] = this.targetBlock.position[this.workingPlane];  
+            } else {  
+                choppedPosition[this.workingPlane] += overlap;  
+            }  
+              
+            placedMesh.position.set(this.position.x, this.position.y, this.position.z);  
+            choppedMesh.position.set(choppedPosition.x, choppedPosition.y, choppedPosition.z);  
+              
+            blocksToReturn.placed = placedMesh;  
+            if(!blocksToReturn.bonus) blocksToReturn.chopped = choppedMesh;  
+        } else {  
+            this.state = this.STATES.MISSED;  
+        }  
+        return blocksToReturn;  
+    }  
+      
+    tick() {  
+        if(this.state == this.STATES.ACTIVE) {  
+            let value = this.position[this.workingPlane];  
+            if(value > this.MOVE_AMOUNT || value < -this.MOVE_AMOUNT) this.reverseDirection();  
+            this.position[this.workingPlane] += this.direction;      
+            this.mesh.position[this.workingPlane] = this.position[this.workingPlane];        
+        }  
+    }
+}
+
+// --- ENGINE CONTROLLER CORE ---
+class GameEngine {
+    constructor() {
+        this.STATES = { 'LOADING': 'loading', 'PLAYING': 'playing', 'READY': 'ready', 'ENDED': 'ended', 'RESETTING': 'resetting' };
+        this.blocks = [];
+        this.debrisPool = [];
+        this.shockwaves = [];
+        this.state = this.STATES.LOADING;
+        this.comboCount = 0;
+
+        // Color Shift Mapping Setup
+        this.zones = [
+            { height: 0, name: "The Canopy", color: "#D0CBC7" },
+            { height: 10, name: "The Stratosphere", color: "#779ECB" },
+            { height: 25, name: "Cosmic Nebula", color: "#4B3F72" },
+            { height: 40, name: "Deep Space Void", color: "#1A1A2E" }
+        ];
+        this.currentZoneIndex = 0;
+
+        this.stage = new Stage();  
+        this.mainContainer = document.getElementById('container');  
+        this.scoreContainer = document.getElementById('score');  
+        this.highScoreContainer = document.getElementById('best-score');
+        this.instructions = document.getElementById('instructions');  
+        this.zoneToast = document.getElementById('zone-toast');
+        
+        this.bestScore = parseInt(localStorage.getItem('stack_high_score') || '0');
+        this.highScoreContainer.innerHTML = `BEST: ${this.bestScore}`;
+        
+        // Explicitly lock interface scoring overlay strictly to zero on bootup
+        this.scoreContainer.innerHTML = '0';
+          
+        this.newBlocks = new THREE.Group();  
+        this.placedBlocks = new THREE.Group();  
+        this.choppedBlocks = new THREE.Group();  
+          
+        this.stage.add(this.newBlocks);  
+        this.stage.add(this.placedBlocks);  
+        this.stage.add(this.choppedBlocks);  
+          
+        this.createHighscoreLine();
+        this.addBlock();  
+        this.tick();  
+        this.updateState(this.STATES.READY);  
+          
+        document.addEventListener('keydown', e => { if(e.keyCode == 32) this.onAction(); });  
+        
+        const handleInteraction = (e) => {
+            if(e.target.id === 'start-button' || e.target.id === 'pwa-install-btn') return;
+            e.preventDefault();
+            this.onAction();
+        };
+        document.addEventListener('pointerdown', handleInteraction, { passive: false });  
+    }  
+
+    createHighscoreLine() {
+        if(this.bestScore <= 0) return;
+        const geometry = new THREE.BoxGeometry(14, 0.05, 14);
+        const material = new THREE.MeshBasicMaterial({ color: 0xff0055, transparent: true, opacity: 0.4, wireframe: true });
+        this.ghostLine = new THREE.Mesh(geometry, material);
+        // Map line to the actual high score block position height
+        this.ghostLine.position.set(0, (this.bestScore + 1) * 2, 0);
+        this.stage.add(this.ghostLine);
+    }
+
+    updateState(newState) {  
+        for(let key in this.STATES) this.mainContainer.classList.remove(this.STATES[key]);  
+        this.mainContainer.classList.add(newState);  
+        this.state = newState;  
+    }  
+
+    onAction() {  
+        switch(this.state) {  
+            case this.STATES.READY: audio.init(); this.startGame(); break;  
+            case this.STATES.PLAYING: this.placeBlock(); break;  
+            case this.STATES.ENDED: this.restartGame(); break;      
+        }  
+    }  
+      
+    startGame() {  
+        if(this.state != this.STATES.PLAYING) {  
+            this.scoreContainer.innerHTML = '0';  
+            this.updateState(this.STATES.PLAYING);  
+            audio.startBGM();
+            // Inject next moving node block instance safely
+            if(this.blocks.length === 1) {
+                this.addBlock();
+            }  
+        }  
+    }  
+
+    restartGame() {  
+        this.updateState(this.STATES.RESETTING);  
+        this.comboCount = 0;
+        this.currentZoneIndex = 0;
+        this.updateEnvironmentColor(this.zones[0].color);
+        
+        let oldBlocks = this.placedBlocks.children;  
+        let removeSpeed = 0.15;  
+        let delayAmount = 0.015;  
+        for(let i = oldBlocks.length - 1; i >= 0; i--) {  
+            gsap.to(oldBlocks[i].scale, {x: 0, y: 0, z: 0, duration: removeSpeed, delay: (oldBlocks.length - i) * delayAmount, ease: "power1.in", onComplete: () => this.placedBlocks.remove(oldBlocks[i])});  
+        }  
+        let cameraMoveSpeed = removeSpeed * 2 + (oldBlocks.length * delayAmount);  
+        this.stage.setCamera(2, cameraMoveSpeed);  
+          
+        let countdown = {value: this.blocks.length - 1};  
+        gsap.to(countdown, {value: 0, duration: cameraMoveSpeed, onUpdate: () => {this.scoreContainer.innerHTML = String(Math.round(countdown.value))}});  
+          
+        this.blocks = this.blocks.slice(0, 1);  
+        setTimeout(() => { this.startGame(); }, cameraMoveSpeed * 1000);  
+    }  
+      
+    placeBlock() {  
+        let currentBlock = this.blocks[this.blocks.length - 1];  
+        let newBlocks = currentBlock.place();  
+        this.newBlocks.remove(currentBlock.mesh);  
+        
+        if(newBlocks.placed) this.placedBlocks.add(newBlocks.placed);  
+        
+        if(newBlocks.bonus) {
+            this.comboCount++;
+            audio.playSFX('perfect');
+            this.spawnShockwave(currentBlock.position.x, currentBlock.position.y, currentBlock.position.z, currentBlock.dimension.width, currentBlock.dimension.depth);
+            gsap.fromTo(this.scoreContainer, {scale: 1.3}, {scale: 1, duration: 0.2});
+        } else {
+            this.comboCount = 0;
+            if(newBlocks.placed) audio.playSFX('drop');
+        }
+
+        if(newBlocks.chopped) {  
+            this.choppedBlocks.add(newBlocks.chopped);  
+            this.spawnSliceParticles(newBlocks.chopped.position, currentBlock.color);
+            
+            let positionParams = {y: '-=30', duration: 1, ease: "power1.in", onComplete: () => this.choppedBlocks.remove(newBlocks.chopped)};  
+            if(newBlocks.chopped.position[newBlocks.plane] > newBlocks.placed.position[newBlocks.plane]) {  
+                positionParams[newBlocks.plane] = '+=' + (40 * Math.abs(newBlocks.direction));  
+            } else {  
+                positionParams[newBlocks.plane] = '-=' + (40 * Math.abs(newBlocks.direction));  
+            }  
+            gsap.to(newBlocks.chopped.position, positionParams);  
+            gsap.to(newBlocks.chopped.rotation, {
+                duration: 1,
+                delay: 0.02,
+                x: newBlocks.plane == 'z' ? (Math.random() * 4 - 2) : 0.05,  
+                z: newBlocks.plane == 'x' ? (Math.random() * 4 - 2) : 0.05,  
+                y: Math.random() * 0.2  
+            });  
+        }  
+        this.addBlock();  
+    }  
+      
+    addBlock() {  
+        let lastBlock = this.blocks[this.blocks.length - 1];  
+        if(lastBlock && lastBlock.state == lastBlock.STATES.MISSED) { return this.endGame(); }  
+          
+        // Enforce zero metric evaluation score clamping if engine is waiting in menu configuration space
+        const score = this.state === this.STATES.READY ? 0 : Math.max(0, this.blocks.length - 1);
+        this.scoreContainer.innerHTML = String(score);  
+        
+        this.checkZoneMilestones(score);
+        
+        let nextBlock = new Block(lastBlock);  
+        this.newBlocks.add(nextBlock.mesh);  
+        this.blocks.push(nextBlock);  
+        this.stage.setCamera(this.blocks.length * 2);  
+          
+        if(this.blocks.length >= 5) this.instructions.style.opacity = 0;  
+    }  
+
+    spawnShockwave(x, y, z, w, d) {
+        let size = Math.max(w, d) * 1.2;
+        let geometry = new THREE.RingGeometry(size - 0.2, size, 32);
+        geometry.rotateX(-Math.PI / 2);
+        let colorIndex = Math.min(this.comboCount, 4);
+        let colors = [0xffffff, 0xAAFFFF, 0x55FFFF, 0x00FFFF, 0xFFD700];
+        let material = new THREE.MeshBasicMaterial({color: colors[colorIndex - 1], side: THREE.DoubleSide, transparent: true, opacity: 0.8});
+        let ring = new THREE.Mesh(geometry, material);
+        ring.position.set(x + w/2, y, z + d/2);
+        this.stage.add(ring);
+        this.shockwaves.push({ mesh: ring, scale: 1.0, opacity: 0.8 });
+    }
+
+    spawnSliceParticles(pos, color) {
+        for(let i = 0; i < 8; i++) {
+            let pGeo = new THREE.BoxGeometry(0.3, 0.3, 0.3);
+            let pMat = new THREE.MeshBasicMaterial({color: color});
+            let pMesh = new THREE.Mesh(pGeo, pMat);
+            pMesh.position.set(pos.x + Math.random()*2, pos.y, pos.z + Math.random()*2);
+            this.stage.add(pMesh);
+            this.debrisPool.push({
+                mesh: pMesh,
+                vx: (Math.random() - 0.5) * 0.3,
+                vy: Math.random() * 0.2 + 0.1,
+                vz: (Math.random() - 0.5) * 0.3
+            });
+        }
+    }
+
+    checkZoneMilestones(score) {
+        let matchingZoneIndex = 0;
+        for(let i = this.zones.length - 1; i >= 0; i--) {
+            if(score >= this.zones[i].height) {
+                matchingZoneIndex = i;
+                break;
+            }
+        }
+        if(matchingZoneIndex !== this.currentZoneIndex) {
+            this.currentZoneIndex = matchingZoneIndex;
+            const targetZone = this.zones[matchingZoneIndex];
+            
+            this.zoneToast.innerHTML = targetZone.name;
+            gsap.fromTo(this.zoneToast, {opacity: 0, scale: 0.6}, {opacity: 1, scale: 1, duration: 0.4, yBy: -10, yoyo: true, repeatDelay: 1.5, repeat: 1});
+            
+            this.updateEnvironmentColor(targetZone.color);
+        }
+    }
+
+    updateEnvironmentColor(hexStr) {
+        document.body.style.backgroundColor = hexStr;
+        gsap.to(this.stage.renderer.getClearColor(new THREE.Color()), {
+            r: new THREE.Color(hexStr).r,
+            g: new THREE.Color(hexStr).g,
+            b: new THREE.Color(hexStr).b,
+            duration: 0.8,
+            onUpdate: () => {
+                this.stage.renderer.setClearColor(this.stage.renderer.getClearColor(new THREE.Color()), 1);
+            }
+        });
+    }
+      
+    endGame() { 
+        this.updateState(this.STATES.ENDED); 
+        audio.playSFX('game_over');
+        audio.duckBGM();
+        
+        const finalScore = Math.max(0, this.blocks.length - 2);
+        if(finalScore > this.bestScore) {
+            this.bestScore = finalScore;
+            localStorage.setItem('stack_high_score', this.bestScore);
+            this.highScoreContainer.innerHTML = `BEST: ${this.bestScore}`;
+            if(this.ghostLine) this.ghostLine.position.y = (this.bestScore + 1) * 2;
+        }
+    }  
+
+    tick() {  
+        this.blocks[this.blocks.length - 1].tick();  
+        
+        for(let i = this.debrisPool.length - 1; i >= 0; i--) {
+            let p = this.debrisPool[i];
+            p.vy -= 0.015;
+            p.mesh.position.x += p.vx;
+            p.mesh.position.y += p.vy;
+            p.mesh.position.z += p.vz;
+            if(p.mesh.position.y < -10) {
+                this.stage.remove(p.mesh);
+                this.debrisPool.splice(i, 1);
+            }
+        }
+
+        for(let i = this.shockwaves.length - 1; i >= 0; i--) {
+            let sw = this.shockwaves[i];
+            sw.scale += 0.08;
+            sw.opacity -= 0.03;
+            sw.mesh.scale.set(sw.scale, 1, sw.scale);
+            sw.mesh.material.opacity = sw.opacity;
+            if(sw.opacity <= 0) {
+                this.stage.remove(sw.mesh);
+                this.shockwaves.splice(i, 1);
+            }
+        }
+
+        this.stage.render();  
+        requestAnimationFrame(() => {this.tick()});  
+    }
+}
+
+let game;
+window.addEventListener('DOMContentLoaded', () => { game = new GameEngine(); });
+
+// PWA Module Hook Contexts
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    setTimeout(() => {
+        if(game && game.state === 'ready') document.getElementById('pwa-banner').classList.add('show');
+    }, 2500);
+});
+document.getElementById('pwa-install-btn').addEventListener('click', async () => {
+    if (!deferredPrompt) return;
+    document.getElementById('pwa-banner').classList.remove('show');
+    deferredPrompt.prompt();
+    deferredPrompt = null;
+});
+
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+    });
+}
+</script>
+</body>
+</html>
